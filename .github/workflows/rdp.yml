@@ -25,7 +25,15 @@ jobs:
     - run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
     - run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "p@ssw0rd!" -Force)
 
-    # 4. Khôi phục dữ liệu từ Artifact (nếu có)
+    # 4. Kiểm tra và tạo thư mục dữ liệu nếu cần
+    - name: Check and Create Data Directory
+      run: |
+        if (!(Test-Path -Path "$env:USERPROFILE\playit-data")) {
+          Write-Output "No data directory found, creating it."
+          New-Item -ItemType Directory -Path "$env:USERPROFILE\playit-data"
+        }
+
+    # 5. Khôi phục dữ liệu từ Artifact (nếu có)
     - name: Restore Previous Data from Artifacts
       uses: actions/download-artifact@v3
       with:
@@ -33,26 +41,22 @@ jobs:
         path: $env:USERPROFILE\playit-data
       continue-on-error: true  # Bỏ qua nếu không có artifact
 
-    # 5. Khởi chạy Playit và thiết lập RDP Tunnel
+    # 6. Khởi chạy Playit và thiết lập RDP Tunnel
     - name: Start Playit and Set Up RDP Tunnel
       env:
         PLAYIT_AUTH_KEY: ${{ secrets.PL }}
       run: |
-        # Tạo thư mục lưu dữ liệu nếu chưa tồn tại
-        if (!(Test-Path -Path "$env:USERPROFILE\playit-data")) {
-          New-Item -ItemType Directory -Path "$env:USERPROFILE\playit-data"
-        }
         Start-Process -FilePath "$env:USERPROFILE\playit.exe" -ArgumentList "--secret $env:PLAYIT_AUTH_KEY" -NoNewWindow -Wait
         Start-Process -FilePath "$env:USERPROFILE\playit.exe" -NoNewWindow
 
-    # 6. Lưu dữ liệu hiện tại vào Artifact
+    # 7. Lưu dữ liệu hiện tại vào Artifact
     - name: Save Data to Artifacts
       uses: actions/upload-artifact@v3
       with:
         name: playit-data
         path: $env:USERPROFILE\playit-data
 
-    # 7. Giữ phiên làm việc hoạt động (tránh đóng workflow)
+    # 8. Giữ phiên làm việc hoạt động (tránh đóng workflow)
     - name: Keep the GitHub Action Runner Alive
       run: |
         Start-Sleep -Seconds 11800  # Adjust the duration based on your needs
